@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watermelon Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .game-wrapper {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+            max-width: 900px;
+        }
+
+        .game-container {
+            position: relative;
+        }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .game-header h1 {
+            font-size: 28px;
+            background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 4px;
+        }
+
+        .game-header p {
+            color: #a0a0c0;
+            font-size: 13px;
+        }
+
+        .score-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .score-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #feca57;
+        }
+
+        .next-fruit-preview {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .next-fruit-preview span {
+            font-size: 13px;
+            color: #a0a0c0;
+        }
+
+        .next-fruit-emoji {
+            font-size: 28px;
+            animation: float 2s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        #gameCanvas {
+            border-radius: 16px;
+            cursor: crosshair;
+            display: block;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+
+        .side-panel {
+            width: 240px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel-card {
+            background: rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .panel-card h3 {
+            font-size: 15px;
+            color: #48dbfb;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .fruit-guide {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .fruit-guide-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #c0c0e0;
+            padding: 4px 6px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+        }
+
+        .fruit-guide-item .emoji {
+            font-size: 18px;
+        }
+
+        .fruit-guide-item .arrow {
+            color: #48dbfb;
+            font-size: 10px;
+        }
+
+        .leaderboard-list {
+            list-style: none;
+        }
+
+        .leaderboard-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            border-radius: 8px;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .leaderboard-list li:nth-child(odd) {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .leaderboard-list li:hover {
+            background: rgba(255,255,255,0.08);
+        }
+
+        .leaderboard-rank {
+            width: 24px;
+            font-weight: bold;
+            color: #feca57;
+        }
+
+        .leaderboard-name {
+            flex: 1;
+            color: #e0e0ff;
+        }
+
+        .leaderboard-score {
+            font-weight: bold;
+            color: #48dbfb;
+        }
+
+        .controls-info {
+            font-size: 12px;
+            color: #808090;
+            line-height: 1.6;
+        }
+
+        /* Game Over Overlay */
+        .game-over-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            border-radius: 16px;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+
+        .game-over-overlay.active {
+            display: flex;
+        }
+
+        .game-over-content {
+            text-align: center;
+            padding: 30px;
+        }
+
+        .game-over-content h2 {
+            font-size: 36px;
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        }
+
+        .game-over-content .final-score {
+            font-size: 48px;
+            font-weight: bold;
+            color: #feca57;
+            margin-bottom: 20px;
+        }
+
+        .game-over-content input {
+            width: 220px;
+            padding: 10px 16px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            margin-bottom: 12px;
+            transition: border-color 0.3s;
+        }
+
+        .game-over-content input:focus {
+            border-color: #48dbfb;
+        }
+
+        .game-over-content input::placeholder {
+            color: rgba(255,255,255,0.4);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #48dbfb, #0abde3);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+            color: #fff;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #feca57, #f39c12);
+            color: #333;
+        }
+
+        .merge-flash {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: mergeAnim 0.4s ease-out forwards;
+            z-index: 50;
+        }
+
+        @keyframes mergeAnim {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+
+        .combo-text {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: #feca57;
+            pointer-events: none;
+            animation: comboFloat 0.8s ease-out forwards;
+            z-index: 50;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        @keyframes comboFloat {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-60px) scale(1.3); opacity: 0; }
+        }
+
+        .drop-line {
+            position: absolute;
+            width: 2px;
+            background: rgba(255,255,255,0.15);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        @media (max-width: 700px) {
+            .game-wrapper {
+                flex-direction: column;
+                align-items: center;
+            }
+            .side-panel {
+                width: 100%;
+                max-width: 420px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-wrapper">
+        <div class="game-container">
+            <div class="game-header">
+                <h1>WATERMELON GAME</h1>
+                <p>Drop & merge fruits to make a watermelon!</p>
+            </div>
+
+            <div class="score-display">
+                <div>
+                    <div style="font-size: 12px; color: #a0a0c0;">SCORE</div>
+                    <div class="score-value" id="scoreDisplay">0</div>
+                </div>
+                <div class="next-fruit-preview">
+                    <span>NEXT</span>
+                    <div class="next-fruit-emoji" id="nextFruitPreview"></div>
+                </div>
+            </div>
+
+            <div style="position: relative; display: inline-block;">
+                <canvas id="gameCanvas" width="420" height="700"></canvas>
+                <div class="game-over-overlay" id="gameOverOverlay">
+                    <div class="game-over-content">
+                        <h2>GAME OVER</h2>
+                        <div class="final-score" id="finalScore">0</div>
+                        <div style="margin-bottom: 16px;">
+                            <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20" autocomplete="off">
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-submit" id="submitScoreBtn" onclick="submitScore()">Submit Score</button>
+                            <button class="btn btn-secondary" onclick="restartGame()">Play Again</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="side-panel">
+            <div class="panel-card">
+                <h3>Merge Guide</h3>
+                <div class="fruit-guide" id="fruitGuide"></div>
+            </div>
+
+            <div class="panel-card">
+                <h3>Leaderboard</h3>
+                <ul class="leaderboard-list" id="leaderboardList">
+                    <li style="color: #808090; justify-content: center;">Loading...</li>
+                </ul>
+            </div>
+
+            <div class="panel-card">
+                <h3>How to Play</h3>
+                <div class="controls-info">
+                    Click or tap to drop a fruit.<br>
+                    When two same fruits touch, they merge into a bigger fruit!<br>
+                    Keep merging to create the legendary Watermelon.<br>
+                    Game ends when fruits reach the top.
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ============================================================
+// WATERMELON GAME - Complete Implementation with Matter.js
+// ============================================================
+
+const { Engine, Render, Runner, Bodies, Body, Composite, Events, Mouse, Vector } = Matter;
+
+// -- Fruit definitions --
+const FRUITS = [
+    { name: "Cherry",      emoji: "\u{1F352}", radius: 15, color: "#e74c3c",  points: 1,   gradient: ["#ff6b6b", "#c0392b"] },
+    { name: "Strawberry",  emoji: "\u{1F353}", radius: 20, color: "#e91e63",  points: 3,   gradient: ["#fd79a8", "#e84393"] },
+    { name: "Grape",       emoji: "\u{1F347}", radius: 25, color: "#9b59b6",  points: 6,   gradient: ["#a29bfe", "#6c5ce7"] },
+    { name: "Orange",      emoji: "\u{1F34A}", radius: 32, color: "#f39c12",  points: 10,  gradient: ["#ffeaa7", "#e17055"] },
+    { name: "Peach",       emoji: "\u{1F351}", radius: 40, color: "#fd79a8",  points: 15,  gradient: ["#fab1a0", "#e17055"] },
+    { name: "Apple",       emoji: "\u{1F34E}", radius: 47, color: "#e74c3c",  points: 21,  gradient: ["#ff7675", "#d63031"] },
+    { name: "Pear",        emoji: "\u{1F350}", radius: 55, color: "#a8e06c",  points: 28,  gradient: ["#dfe6e9", "#a8e06c"] },
+    { name: "Pineapple",   emoji: "\u{1F34D}", radius: 65, color: "#fdcb6e",  points: 36,  gradient: ["#ffeaa7", "#f9ca24"] },
+    { name: "Melon",       emoji: "\u{1F348}", radius: 75, color: "#00b894",  points: 45,  gradient: ["#55efc4", "#00b894"] },
+    { name: "Watermelon",  emoji: "\u{1F349}", radius: 90, color: "#27ae60",  points: 55,  gradient: ["#00b894", "#006400"] },
+];
+
+const CANVAS_WIDTH = 420;
+const CANVAS_HEIGHT = 700;
+const WALL_THICKNESS = 20;
+const DANGER_LINE_Y = 100;
+const DROP_Y = 60;
+const DROP_COOLDOWN = 400; // ms
+
+// -- Game state --
+let engine, render, runner;
+let score = 0;
+let currentFruitIndex = 0;
+let nextFruitIndex = 0;
+let gameOver = false;
+let canDrop = true;
+let lastDropTime = 0;
+let mouseX = CANVAS_WIDTH / 2;
+let fruitBodies = new Map(); // body.id -> fruitIndex
+let mergeProcessing = new Set(); // prevent double merges
+
+// ---- Initialize the fruit guide panel ----
+function initFruitGuide() {
+    const guide = document.getElementById("fruitGuide");
+    guide.innerHTML = "";
+    for (let i = 0; i < FRUITS.length; i++) {
+        const div = document.createElement("div");
+        div.className = "fruit-guide-item";
+        if (i < FRUITS.length - 1) {
+            div.innerHTML = `<span class="emoji">${FRUITS[i].emoji}</span>
+                <span class="arrow">+</span>
+                <span class="emoji">${FRUITS[i].emoji}</span>
+                <span class="arrow">=</span>
+                <span class="emoji">${FRUITS[i + 1].emoji}</span>`;
+        } else {
+            div.innerHTML = `<span class="emoji">${FRUITS[i].emoji}</span>
+                <span style="color:#feca57;font-size:10px;">MAX!</span>`;
+        }
+        guide.appendChild(div);
+    }
+}
+
+// ---- Load leaderboard from backend ----
+async function loadLeaderboard() {
+    try {
+        const res = await fetch("/api/scores");
+        const data = await res.json();
+        const list = document.getElementById("leaderboardList");
+        if (data.length === 0) {
+            list.innerHTML = '<li style="color: #808090; justify-content: center; font-size: 13px;">No scores yet. Be the first!</li>';
+            return;
+        }
+        list.innerHTML = "";
+        data.forEach((entry, i) => {
+            const li = document.createElement("li");
+            const medal = i === 0 ? "\u{1F947}" : i === 1 ? "\u{1F948}" : i === 2 ? "\u{1F949}" : "";
+            li.innerHTML = `
+                <span class="leaderboard-rank">${medal || (i + 1)}</span>
+                <span class="leaderboard-name">${escapeHtml(entry.player_name)}</span>
+                <span class="leaderboard-score">${entry.score.toLocaleString()}</span>
+            `;
+            list.appendChild(li);
+        });
+    } catch (e) {
+        console.error("Failed to load leaderboard:", e);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ---- Submit score ----
+async function submitScore() {
+    const nameInput = document.getElementById("playerNameInput");
+    const name = nameInput.value.trim();
+    if (!name) {
+        nameInput.style.borderColor = "#ff6b6b";
+        nameInput.focus();
+        return;
+    }
+    const btn = document.getElementById("submitScoreBtn");
+    btn.disabled = true;
+    btn.textContent = "Submitting...";
+    try {
+        await fetch("/api/scores", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ player_name: name, score: score }),
+        });
+        btn.textContent = "Submitted!";
+        btn.style.background = "linear-gradient(135deg, #55efc4, #00b894)";
+        await loadLeaderboard();
+    } catch (e) {
+        console.error("Failed to submit score:", e);
+        btn.textContent = "Error - Retry";
+        btn.disabled = false;
+    }
+}
+
+// ---- Pick random fruit index (only small fruits for dropping) ----
+function pickRandomFruit() {
+    // Only the first 5 fruits can be dropped
+    return Math.floor(Math.random() * 5);
+}
+
+// ---- Create a fruit body ----
+function createFruitBody(x, y, fruitIndex, isStatic = false) {
+    const fruit = FRUITS[fruitIndex];
+    const body = Bodies.circle(x, y, fruit.radius, {
+        restitution: 0.2,
+        friction: 0.5,
+        density: 0.001 + fruitIndex * 0.0005,
+        isStatic: isStatic,
+        label: "fruit",
+        render: { visible: false }, // We draw custom
+    });
+    body.fruitIndex = fruitIndex;
+    fruitBodies.set(body.id, fruitIndex);
+    Composite.add(engine.world, body);
+    return body;
+}
+
+// ---- Draw custom fruit graphics ----
+function drawFruits(ctx) {
+    const bodies = Composite.allBodies(engine.world);
+    for (const body of bodies) {
+        if (body.label !== "fruit") continue;
+        const fi = body.fruitIndex;
+        if (fi === undefined) continue;
+        const fruit = FRUITS[fi];
+        const pos = body.position;
+        const r = fruit.radius;
+
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.rotate(body.angle);
+
+        // Draw gradient circle
+        const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+        grad.addColorStop(0, fruit.gradient[0]);
+        grad.addColorStop(1, fruit.gradient[1]);
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Glossy highlight
+        const hl = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.05, -r * 0.2, -r * 0.2, r * 0.6);
+        hl.addColorStop(0, "rgba(255,255,255,0.5)");
+        hl.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fillStyle = hl;
+        ctx.fill();
+
+        // Subtle border
+        ctx.strokeStyle = "rgba(0,0,0,0.15)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Draw emoji
+        const fontSize = Math.max(r * 0.9, 12);
+        ctx.font = `${fontSize}px serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(fruit.emoji, 0, 1);
+
+        ctx.restore();
+    }
+}
+
+// ---- Draw the game UI overlay on canvas ----
+function drawUI(ctx) {
+    // Danger line
+    ctx.save();
+    ctx.setLineDash([8, 6]);
+    ctx.strokeStyle = "rgba(255, 107, 107, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(WALL_THICKNESS, DANGER_LINE_Y);
+    ctx.lineTo(CANVAS_WIDTH - WALL_THICKNESS, DANGER_LINE_Y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Drop preview (if not game over)
+    if (!gameOver && canDrop) {
+        const fruit = FRUITS[currentFruitIndex];
+        const dropX = Math.max(WALL_THICKNESS + fruit.radius, Math.min(mouseX, CANVAS_WIDTH - WALL_THICKNESS - fruit.radius));
+
+        // Guide line
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = "rgba(255,255,255,0.12)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(dropX, DROP_Y + fruit.radius);
+        ctx.lineTo(dropX, CANVAS_HEIGHT - WALL_THICKNESS);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // Preview fruit (semi-transparent)
+        ctx.save();
+        ctx.globalAlpha = 0.6;
+        const r = fruit.radius;
+        const grad = ctx.createRadialGradient(dropX - r * 0.3, DROP_Y - r * 0.3, r * 0.1, dropX, DROP_Y, r);
+        grad.addColorStop(0, fruit.gradient[0]);
+        grad.addColorStop(1, fruit.gradient[1]);
+        ctx.beginPath();
+        ctx.arc(dropX, DROP_Y, r, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        const fontSize = Math.max(r * 0.9, 12);
+        ctx.font = `${fontSize}px serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(fruit.emoji, dropX, DROP_Y + 1);
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+    }
+}
+
+// ---- Merge animation ----
+function showMergeEffect(x, y, fruitIndex) {
+    const fruit = FRUITS[fruitIndex];
+    const container = document.querySelector(".game-container");
+    const canvasEl = document.getElementById("gameCanvas");
+    const rect = canvasEl.getBoundingClientRect();
+    const offsetX = canvasEl.offsetLeft;
+    const offsetY = canvasEl.offsetTop;
+
+    // Flash circle
+    const flash = document.createElement("div");
+    flash.className = "merge-flash";
+    flash.style.left = (offsetX + x - 15) + "px";
+    flash.style.top = (offsetY + y - 15) + "px";
+    flash.style.width = "30px";
+    flash.style.height = "30px";
+    flash.style.background = `radial-gradient(circle, ${fruit.gradient[0]}, transparent)`;
+    container.querySelector("div:last-child").appendChild(flash);
+    setTimeout(() => flash.remove(), 400);
+
+    // Points text
+    const combo = document.createElement("div");
+    combo.className = "combo-text";
+    combo.style.left = (offsetX + x - 30) + "px";
+    combo.style.top = (offsetY + y - 20) + "px";
+    combo.textContent = `+${fruit.points}`;
+    container.querySelector("div:last-child").appendChild(combo);
+    setTimeout(() => combo.remove(), 800);
+}
+
+// ---- Handle merging on collision ----
+function handleCollisions() {
+    Events.on(engine, "collisionStart", (event) => {
+        if (gameOver) return;
+        for (const pair of event.pairs) {
+            const bodyA = pair.bodyA;
+            const bodyB = pair.bodyB;
+
+            if (bodyA.label !== "fruit" || bodyB.label !== "fruit") continue;
+            if (bodyA.fruitIndex === undefined || bodyB.fruitIndex === undefined) continue;
+            if (bodyA.fruitIndex !== bodyB.fruitIndex) continue;
+            if (bodyA.fruitIndex >= FRUITS.length - 1) continue; // Watermelon can't merge
+
+            const idA = bodyA.id;
+            const idB = bodyB.id;
+            const mergeKey = Math.min(idA, idB) + ":" + Math.max(idA, idB);
+            if (mergeProcessing.has(mergeKey)) continue;
+            // Also skip if either body has already been removed
+            if (!fruitBodies.has(idA) || !fruitBodies.has(idB)) continue;
+
+            mergeProcessing.add(mergeKey);
+
+            const newIndex = bodyA.fruitIndex + 1;
+            const midX = (bodyA.position.x + bodyB.position.x) / 2;
+            const midY = (bodyA.position.y + bodyB.position.y) / 2;
+
+            // Remove old bodies
+            Composite.remove(engine.world, bodyA);
+            Composite.remove(engine.world, bodyB);
+            fruitBodies.delete(idA);
+            fruitBodies.delete(idB);
+
+            // Create new merged fruit
+            const newBody = createFruitBody(midX, midY, newIndex);
+            // Give it a little pop
+            Body.setVelocity(newBody, { x: 0, y: -2 });
+
+            // Update score
+            score += FRUITS[newIndex].points;
+            document.getElementById("scoreDisplay").textContent = score.toLocaleString();
+
+            // Show merge effect
+            showMergeEffect(midX, midY, newIndex);
+
+            // Clean up merge key after a frame
+            setTimeout(() => mergeProcessing.delete(mergeKey), 100);
+        }
+    });
+}
+
+// ---- Check game over condition ----
+function checkGameOver() {
+    if (gameOver) return;
+    const bodies = Composite.allBodies(engine.world);
+    for (const body of bodies) {
+        if (body.label !== "fruit") continue;
+        if (body.isStatic) continue;
+        // Only check bodies that have settled (been in the world a bit)
+        if (body.speed > 1) continue;
+        const topY = body.position.y - FRUITS[body.fruitIndex].radius;
+        if (topY < DANGER_LINE_Y && body.position.y > 30) {
+            triggerGameOver();
+            return;
+        }
+    }
+}
+
+function triggerGameOver() {
+    gameOver = true;
+    canDrop = false;
+    document.getElementById("finalScore").textContent = score.toLocaleString();
+    document.getElementById("gameOverOverlay").classList.add("active");
+    document.getElementById("playerNameInput").focus();
+}
+
+// ---- Drop fruit ----
+function dropFruit(x) {
+    if (!canDrop || gameOver) return;
+    const now = Date.now();
+    if (now - lastDropTime < DROP_COOLDOWN) return;
+
+    const fruit = FRUITS[currentFruitIndex];
+    const dropX = Math.max(WALL_THICKNESS + fruit.radius, Math.min(x, CANVAS_WIDTH - WALL_THICKNESS - fruit.radius));
+
+    createFruitBody(dropX, DROP_Y, currentFruitIndex);
+    lastDropTime = now;
+
+    // Cycle to next fruit
+    currentFruitIndex = nextFruitIndex;
+    nextFruitIndex = pickRandomFruit();
+    document.getElementById("nextFruitPreview").textContent = FRUITS[nextFruitIndex].emoji;
+
+    canDrop = false;
+    setTimeout(() => { canDrop = true; }, DROP_COOLDOWN);
+}
+
+// ---- Restart game ----
+function restartGame() {
+    // Clear world
+    Composite.clear(engine.world, false);
+    fruitBodies.clear();
+    mergeProcessing.clear();
+
+    // Reset state
+    score = 0;
+    gameOver = false;
+    canDrop = true;
+    lastDropTime = 0;
+    document.getElementById("scoreDisplay").textContent = "0";
+    document.getElementById("gameOverOverlay").classList.remove("active");
+
+    // Reset submit button
+    const btn = document.getElementById("submitScoreBtn");
+    btn.disabled = false;
+    btn.textContent = "Submit Score";
+    btn.style.background = "linear-gradient(135deg, #feca57, #f39c12)";
+    document.getElementById("playerNameInput").value = "";
+
+    // Re-create walls
+    createWalls();
+
+    // Pick new fruits
+    currentFruitIndex = pickRandomFruit();
+    nextFruitIndex = pickRandomFruit();
+    document.getElementById("nextFruitPreview").textContent = FRUITS[nextFruitIndex].emoji;
+}
+
+// ---- Create walls and floor ----
+function createWalls() {
+    const wallOptions = {
+        isStatic: true,
+        render: { visible: false },
+        label: "wall",
+        friction: 0.3,
+    };
+
+    // Floor
+    const floor = Bodies.rectangle(
+        CANVAS_WIDTH / 2, CANVAS_HEIGHT - WALL_THICKNESS / 2,
+        CANVAS_WIDTH, WALL_THICKNESS,
+        wallOptions
+    );
+
+    // Left wall
+    const leftWall = Bodies.rectangle(
+        WALL_THICKNESS / 2, CANVAS_HEIGHT / 2,
+        WALL_THICKNESS, CANVAS_HEIGHT,
+        wallOptions
+    );
+
+    // Right wall
+    const rightWall = Bodies.rectangle(
+        CANVAS_WIDTH - WALL_THICKNESS / 2, CANVAS_HEIGHT / 2,
+        WALL_THICKNESS, CANVAS_HEIGHT,
+        wallOptions
+    );
+
+    Composite.add(engine.world, [floor, leftWall, rightWall]);
+}
+
+// ---- Draw walls ----
+function drawWalls(ctx) {
+    const wallGrad = ctx.createLinearGradient(0, 0, WALL_THICKNESS, 0);
+    wallGrad.addColorStop(0, "rgba(100, 100, 140, 0.6)");
+    wallGrad.addColorStop(1, "rgba(60, 60, 100, 0.3)");
+
+    // Left wall
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(0, 0, WALL_THICKNESS, CANVAS_HEIGHT);
+
+    // Right wall
+    const wallGrad2 = ctx.createLinearGradient(CANVAS_WIDTH - WALL_THICKNESS, 0, CANVAS_WIDTH, 0);
+    wallGrad2.addColorStop(0, "rgba(60, 60, 100, 0.3)");
+    wallGrad2.addColorStop(1, "rgba(100, 100, 140, 0.6)");
+    ctx.fillStyle = wallGrad2;
+    ctx.fillRect(CANVAS_WIDTH - WALL_THICKNESS, 0, WALL_THICKNESS, CANVAS_HEIGHT);
+
+    // Floor
+    const floorGrad = ctx.createLinearGradient(0, CANVAS_HEIGHT - WALL_THICKNESS, 0, CANVAS_HEIGHT);
+    floorGrad.addColorStop(0, "rgba(60, 60, 100, 0.3)");
+    floorGrad.addColorStop(1, "rgba(100, 100, 140, 0.6)");
+    ctx.fillStyle = floorGrad;
+    ctx.fillRect(0, CANVAS_HEIGHT - WALL_THICKNESS, CANVAS_WIDTH, WALL_THICKNESS);
+}
+
+// ---- Main render loop ----
+function gameLoop() {
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Clear with background
+    const bg = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+    bg.addColorStop(0, "#1a1a2e");
+    bg.addColorStop(0.5, "#16213e");
+    bg.addColorStop(1, "#0f3460");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    drawWalls(ctx);
+    drawFruits(ctx);
+    drawUI(ctx);
+
+    // Game over check (every ~500ms via frame count)
+    if (!gameOver && Date.now() - lastDropTime > 800) {
+        checkGameOver();
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+// ---- Initialize game ----
+function initGame() {
+    // Create physics engine (no built-in renderer)
+    engine = Engine.create({
+        gravity: { x: 0, y: 1.5 },
+    });
+
+    // Create runner
+    runner = Runner.create();
+    Runner.run(runner, engine);
+
+    // Create walls
+    createWalls();
+
+    // Set up collision handling
+    handleCollisions();
+
+    // Pick initial fruits
+    currentFruitIndex = pickRandomFruit();
+    nextFruitIndex = pickRandomFruit();
+    document.getElementById("nextFruitPreview").textContent = FRUITS[nextFruitIndex].emoji;
+
+    // Mouse/touch events
+    const canvas = document.getElementById("gameCanvas");
+
+    canvas.addEventListener("mousemove", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = (e.clientX - rect.left) * (CANVAS_WIDTH / rect.width);
+    });
+
+    canvas.addEventListener("click", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (CANVAS_WIDTH / rect.width);
+        dropFruit(x);
+    });
+
+    canvas.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const x = (touch.clientX - rect.left) * (CANVAS_WIDTH / rect.width);
+        mouseX = x;
+        dropFruit(x);
+    }, { passive: false });
+
+    canvas.addEventListener("touchmove", (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        mouseX = (touch.clientX - rect.left) * (CANVAS_WIDTH / rect.width);
+    }, { passive: false });
+
+    // Start render loop
+    gameLoop();
+
+    // Init side panels
+    initFruitGuide();
+    loadLeaderboard();
+}
+
+// Start when DOM is ready
+document.addEventListener("DOMContentLoaded", initGame);
+</script>
+</body>
+</html>
